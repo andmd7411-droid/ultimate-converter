@@ -1,0 +1,3 @@
+﻿src/components/Converter.tsx(210,105): error TS2322: Type '{ size: number; className: string; title: string | undefined; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/FilePreview.tsx(3,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
