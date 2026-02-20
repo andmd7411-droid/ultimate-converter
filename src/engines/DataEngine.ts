@@ -25,7 +25,7 @@ export class DataEngine {
             try {
                 if (targetFormat === 'JSON' || targetFormat === 'CSV' || targetFormat === 'XML') {
                     // Assume the text is actually just base64 encoded string of that target
-                    const decoded = atob(text.trim());
+                    atob(text.trim()); // Validate base64 structure without storing unused variable
                     // Not a robust assumption without knowing what was encoded, but we'll try to parse it if we need to.
                     // For standard JSON/CSV/XML conversions from actual JSON/CSV/XML:
                 }

@@ -4,8 +4,8 @@ export type FileFormat =
     | 'PDF' | 'TXT' | 'MD' | 'HTML'
     | 'MP3' | 'WAV' | 'OGG' | 'AAC' | 'FLAC'
     | 'MP4' | 'WEBM' | 'AVI' | 'MOV' | 'MKV'
-    | 'JSON' | 'CSV' | 'XML' | 'B64'
-    | 'ZIP';
+    | 'JSON' | 'CSV' | 'XML' | 'B64' | 'JS'
+    | 'ZIP' | 'OBJ';
 
 export interface FileData {
     id: string;

@@ -22,6 +22,9 @@ import { ArchiveEngine } from '../engines/ArchiveEngine';
 import { DataEngine } from '../engines/DataEngine';
 import { EbookEngine } from '../engines/EbookEngine';
 import { FontEngine } from '../engines/FontEngine';
+import { MinifierEngine } from '../engines/MinifierEngine';
+import { VectorEngine } from '../engines/VectorEngine';
+import { ThreeDEngine } from '../engines/ThreeDEngine';
 import FilePreview from './FilePreview';
 
 interface ConverterProps {
@@ -165,6 +168,12 @@ const Converter: React.FC<ConverterProps> = ({ category, allowedFormats }) => {
                     result = await EbookEngine.convertEpub(updatedFiles[i].file, targetFormat);
                 } else if (category === 'font') {
                     result = await FontEngine.generateWebFontCss(updatedFiles[i].file);
+                } else if (category === 'minifier') {
+                    result = await MinifierEngine.minify(updatedFiles[i].file, targetFormat);
+                } else if (category === 'vector') {
+                    result = await VectorEngine.optimizeSvg(updatedFiles[i].file);
+                } else if (category === '3d') {
+                    result = await ThreeDEngine.optimize(updatedFiles[i].file);
                 } else {
                     // Documents
                     if (targetFormat === 'PDF') {

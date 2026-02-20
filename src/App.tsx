@@ -13,13 +13,16 @@ import {
   Info,
   Smartphone,
   BookOpen,
-  Type
+  Type,
+  FileCode2,
+  PenTool,
+  Box
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Converter from './components/Converter';
 import type { FileFormat } from './types';
 
-type Category = 'image' | 'document' | 'audio' | 'video' | 'archive' | 'dashboard';
+type Category = 'image' | 'document' | 'audio' | 'video' | 'archive' | 'dashboard' | 'developer' | 'apple' | 'pdf' | 'ebook' | 'font' | 'minifier' | 'vector' | '3d';
 
 const App: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<Category>('dashboard');
@@ -104,6 +107,30 @@ const App: React.FC = () => {
       description: 'TTF/WOFF to CSS',
       color: 'from-pink-500 to-rose-500',
       formats: ['TTF', 'WOFF', 'WOFF2', 'CSS'] as FileFormat[]
+    },
+    {
+      id: 'minifier',
+      name: 'Code Minifier',
+      icon: <FileCode2 size={24} />,
+      description: 'JS, CSS, HTML',
+      color: 'from-yellow-400 to-yellow-600',
+      formats: ['JS', 'CSS', 'HTML'] as FileFormat[]
+    },
+    {
+      id: 'vector',
+      name: 'SVG Optimizer',
+      icon: <PenTool size={24} />,
+      description: 'Clean & Compress SVG',
+      color: 'from-fuchsia-500 to-purple-600',
+      formats: ['SVG'] as FileFormat[]
+    },
+    {
+      id: '3d',
+      name: '3D Model Studio',
+      icon: <Box size={24} />,
+      description: 'Clean & Compress OBJ',
+      color: 'from-blue-600 to-cyan-600',
+      formats: ['OBJ'] as FileFormat[]
     }
   ];
 
