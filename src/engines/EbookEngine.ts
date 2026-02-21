@@ -23,9 +23,14 @@ export class EbookEngine {
             let content = await zip.files[name].async('string');
             const baseDir = name.substring(0, name.lastIndexOf('/') + 1);
 
-            // Remove TOC / Document Outlines
+            // Remove non-content tags including their inner content
+            content = content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+            content = content.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+            content = content.replace(/<metadata[^>]*>[\s\S]*?<\/metadata>/gi, '');
             content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
             content = content.replace(/<h[1-6][^>]*>(?:Document Outline|Table of Contents)<\/h[1-6]>[\s\S]*?<\/ul>/gi, '');
+            content = content.replace(/@page\s*{[^}]*}/gi, '');
 
             // We'll use a regex to split content by tags of interest (img, a id=p, h1-h3, div page_number)
             // This is safer than replacing with string markers because we need to extract binary data for images

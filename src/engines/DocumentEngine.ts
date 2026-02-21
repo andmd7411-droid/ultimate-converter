@@ -41,7 +41,12 @@ export class DocumentEngine {
                 }
                 // we don't set isFirstPage to false here, because multiple consecutive page breaks on page 1 should be ignored
             } else if (block.type === 'text' && typeof block.content === 'string') {
-                const trimmed = block.content.trim();
+                let trimmed = block.content
+                    .replace(/^\uFEFF/g, '') // BOM UTF-8
+                    .replace(/^\uFFFE/g, '') // BOM UTF-16
+                    .replace(/þÿ/g, '')      // Literal BOM chars usually seen in misencoded strings
+                    .trim();
+
                 if (!trimmed) continue;
 
                 const splitText = doc.splitTextToSize(trimmed, pageWidth - margin * 2);
