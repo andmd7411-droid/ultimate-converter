@@ -7,8 +7,8 @@ export class EbookEngine {
         await zip.loadAsync(file);
 
         // Find content files (html, xhtml, xml, htm) 
-        // Ignoring metadata and structural files
-        const contentFiles = Object.keys(zip.files).filter(name =>
+        const allFiles = Object.keys(zip.files);
+        const contentFiles = allFiles.filter(name =>
             !name.includes('META-INF') &&
             !name.endsWith('.opf') &&
             !name.endsWith('.ncx') &&
@@ -17,62 +17,80 @@ export class EbookEngine {
             name.match(/\.(html|xhtml|htm|xml)/i)
         );
 
-        let fullText = '';
+        const blocks: import('../types').DocumentBlock[] = [];
+
         for (const name of contentFiles) {
             let content = await zip.files[name].async('string');
+            const baseDir = name.substring(0, name.lastIndexOf('/') + 1);
 
-            // Remove TOC / Document Outlines that clutter the end of the text
+            // Remove TOC / Document Outlines
             content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
             content = content.replace(/<h[1-6][^>]*>(?:Document Outline|Table of Contents)<\/h[1-6]>[\s\S]*?<\/ul>/gi, '');
 
-            // Mark illustrations and explicit anchors as explicit page breaks 
-            content = content
-                .replace(/<a[^>]*id="p\d+"[^>]*>/gi, '\n\n---PAGE_BREAK---\n')
-                .replace(/<div(?:[^>]+)class="page_number[^>]*>([\s\S]*?)<\/div>/gi, '\n\n---PAGE_BREAK---\n[$1]\n\n')
-                .replace(/<img[^>]*>/gi, '\n\n[Imagine/Ilustrație]\n\n')
-                .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '\n\n[Ilustrație SVG]\n\n')
-                .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, '\n\n---PAGE_BREAK---\n$1\n\n');
+            // We'll use a regex to split content by tags of interest (img, a id=p, h1-h3, div page_number)
+            // This is safer than replacing with string markers because we need to extract binary data for images
+            const regex = /(<img[^>]+>|<image[^>]+>|<a[^>]*id="p\d+"[^>]*>|<div(?:[^>]+)class="page_number[^>]*>[\s\S]*?<\/div>|<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>)/gi;
+            const parts = content.split(regex);
 
-            const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            for (const part of parts) {
+                if (!part) continue;
 
-            if (bodyMatch) {
-                fullText += bodyMatch[1] + '\n\n---PAGE_BREAK---\n\n';
-            } else if (!name.endsWith('.xml')) {
-                fullText += content + '\n\n---PAGE_BREAK---\n\n';
+                if (part.match(/<a[^>]*id="p\d+"[^>]*>/i) || part.match(/<h[1-3][^>]*>/i)) {
+                    blocks.push({ type: 'page_break' });
+                    if (part.match(/<h[1-3][^>]*>/i)) {
+                        const text = part.replace(/<[^>]+>/g, ' ').trim();
+                        if (text) blocks.push({ type: 'text', content: text });
+                    }
+                } else if (part.match(/<div(?:[^>]+)class="page_number/i)) {
+                    const text = part.replace(/<[^>]+>/g, ' ').trim();
+                    blocks.push({ type: 'page_break' });
+                    if (text) blocks.push({ type: 'text', content: `[${text}]` });
+                } else if (part.match(/<img|<image/i)) {
+                    // Extract src
+                    let src = '';
+                    const srcMatch = part.match(/src=["']([^"']+)["']/i) || part.match(/href=["']([^"']+)["']/i) || part.match(/xlink:href=["']([^"']+)["']/i);
+                    if (srcMatch) src = srcMatch[1];
+
+                    if (src) {
+                        try {
+                            // Resolve path
+                            const fullPath = new URL(src, 'http://localhost/' + baseDir).pathname.substring(1);
+                            const imgFile = zip.files[fullPath] || zip.files[decodeURIComponent(fullPath)];
+
+                            if (imgFile) {
+                                const blob = await imgFile.async('blob');
+                                blocks.push({ type: 'image', content: blob });
+                            }
+                        } catch (e) {
+                            console.warn("Could not load EPUB image:", src, e);
+                        }
+                    }
+                } else {
+                    // Text segment
+                    const text = part.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (text) {
+                        blocks.push({ type: 'text', content: text });
+                    }
+                }
             }
+            blocks.push({ type: 'page_break' });
         }
 
-        if (fullText.trim().length === 0) {
-            // Fallback: extract any text from XML/XHTML files
-            for (const name of contentFiles) {
-                let content = await zip.files[name].async('string');
-
-                content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
-                content = content.replace(/<h[1-6][^>]*>(?:Document Outline|Table of Contents)<\/h[1-6]>[\s\S]*?<\/ul>/gi, '');
-
-                content = content
-                    .replace(/<a[^>]*id="p\d+"[^>]*>/gi, '\n\n---PAGE_BREAK---\n')
-                    .replace(/<div(?:[^>]+)class="page_number[^>]*>([\s\S]*?)<\/div>/gi, '\n\n---PAGE_BREAK---\n[$1]\n\n')
-                    .replace(/<img[^>]*>/gi, '\n\n[Imagine/Ilustrație]\n\n')
-                    .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '\n\n[Ilustrație SVG]\n\n')
-                    .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, '\n\n---PAGE_BREAK---\n$1\n\n');
-
-                const clean = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-                fullText += clean + '\n\n---PAGE_BREAK---\n\n';
-            }
-        }
-
-        if (fullText.trim().length === 0) {
-            throw new Error("Nu s-a putut extrage text din acest EPUB. Poate fi protejat prin DRM sau formatul este invalid.");
+        if (blocks.length === 0) {
+            throw new Error("Nu s-a putut extrage text sau imagini din acest EPUB. Poate fi protejat prin DRM sau formatul este invalid.");
         }
 
         if (targetFormat === 'PDF') {
-            const cleanText = fullText.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\n\s*\n/g, '\n\n');
-            return DocumentEngine.toPDF(cleanText, file.name);
-        } else if (targetFormat === 'TXT') {
-            return DocumentEngine.convertText(fullText, 'TXT');
-        } else if (targetFormat === 'MD') {
-            return DocumentEngine.convertText(fullText, 'MD');
+            return DocumentEngine.toPDF(blocks, file.name);
+        } else if (targetFormat === 'TXT' || targetFormat === 'MD') {
+            // Reconstruct text for simple formats
+            let fullText = '';
+            for (const b of blocks) {
+                if (b.type === 'text') fullText += b.content + '\n\n';
+                else if (b.type === 'image') fullText += '[Imagine/Ilustrație]\n\n';
+                else if (b.type === 'page_break') fullText += '\n---PAGE_BREAK---\n';
+            }
+            return DocumentEngine.convertText(fullText, targetFormat);
         }
 
         throw new Error("Format nesuportat pentru E-book Studio");

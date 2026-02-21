@@ -7,35 +7,100 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export class DocumentEngine {
     /**
-     * Converts a text-based file to PDF with high fidelity.
+     * Converts a text-based file or mixed blocks to PDF with high fidelity.
      */
-    static async toPDF(content: string, _title: string = 'Document'): Promise<Blob> {
+    static async toPDF(content: string | import('../types').DocumentBlock[], _title: string = 'Document'): Promise<Blob> {
         const doc = new jsPDF();
         doc.setFontSize(11);
 
-        const pagesRaw = content.split('---PAGE_BREAK---');
+        let blocks: import('../types').DocumentBlock[];
+
+        if (typeof content === 'string') {
+            const pagesRaw = content.split('---PAGE_BREAK---');
+            blocks = [];
+            for (let i = 0; i < pagesRaw.length; i++) {
+                if (i > 0) blocks.push({ type: 'page_break' });
+                if (pagesRaw[i].trim()) blocks.push({ type: 'text', content: pagesRaw[i] });
+            }
+        } else {
+            blocks = content;
+        }
+
+        let cursorY = 20;
         let isFirstPage = true;
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 15;
+        const lineHeight = 6; // Approx line height for font size 11
 
-        for (let j = 0; j < pagesRaw.length; j++) {
-            const trimmed = pagesRaw[j].trim();
-            // Skip empty parts unless it's the only content
-            if (!trimmed && pagesRaw.length > 1) continue;
+        for (const block of blocks) {
+            if (block.type === 'page_break') {
+                if (!isFirstPage) {
+                    doc.addPage();
+                    cursorY = 20;
+                }
+                // we don't set isFirstPage to false here, because multiple consecutive page breaks on page 1 should be ignored
+            } else if (block.type === 'text' && typeof block.content === 'string') {
+                const trimmed = block.content.trim();
+                if (!trimmed) continue;
 
-            const splitText = doc.splitTextToSize(trimmed, 180);
-            const linesPerPage = 45;
+                const splitText = doc.splitTextToSize(trimmed, pageWidth - margin * 2);
 
-            if (splitText.length === 0) {
-                if (!isFirstPage) doc.addPage();
+                for (let i = 0; i < splitText.length; i++) {
+                    if (cursorY > pageHeight - margin) {
+                        doc.addPage();
+                        cursorY = 20;
+                    }
+                    isFirstPage = false;
+                    doc.text(splitText[i], margin, cursorY);
+                    cursorY += lineHeight;
+                }
+                cursorY += 4; // Spacing after paragraph
+            } else if (block.type === 'image' && block.content instanceof Blob) {
+                const imgData = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target?.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(block.content as Blob);
+                });
+
+                const img = new Image();
+                img.src = imgData;
+                await new Promise<void>((resolve, reject) => {
+                    img.onload = () => resolve();
+                    img.onerror = reject;
+                });
+
+                let availHeight = pageHeight - cursorY - margin;
+                if (availHeight < 40 && !isFirstPage) {
+                    doc.addPage();
+                    cursorY = 20;
+                    availHeight = pageHeight - margin * 2;
+                }
                 isFirstPage = false;
-                continue;
-            }
 
-            for (let i = 0; i < splitText.length; i += linesPerPage) {
-                if (!isFirstPage) doc.addPage();
-                isFirstPage = false;
-                const pageText = splitText.slice(i, i + linesPerPage);
-                doc.text(pageText, 15, 20);
+                const maxImgWidth = pageWidth - margin * 2;
+                const ratio = Math.min(maxImgWidth / img.width, availHeight / img.height);
+                const imgWidth = img.width * ratio;
+                const imgHeight = img.height * ratio;
+                const x = (pageWidth - imgWidth) / 2;
+
+                const mime = block.content.type || 'image/jpeg';
+                const fmt = block.format || (mime.includes('png') ? 'PNG'
+                    : mime.includes('jpg') || mime.includes('jpeg') ? 'JPEG'
+                        : mime.includes('webp') ? 'WEBP' : 'JPEG');
+
+                try {
+                    doc.addImage(imgData, fmt, x, cursorY, imgWidth, imgHeight);
+                } catch {
+                    doc.addImage(imgData, 'JPEG', x, cursorY, imgWidth, imgHeight);
+                }
+                cursorY += imgHeight + 8; // Spacing after image
             }
+        }
+
+        if (isFirstPage) {
+            doc.text("Acest document nu conține text sau imagini recunoscute.", margin, cursorY);
         }
 
         return doc.output('blob');

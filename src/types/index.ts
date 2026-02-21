@@ -26,3 +26,9 @@ export interface ConversionOptions {
     sampleRate?: number;
     resolution?: string;
 }
+
+export interface DocumentBlock {
+    type: 'text' | 'image' | 'page_break';
+    content?: string | Blob;
+    format?: string;
+}
