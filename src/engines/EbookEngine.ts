@@ -19,7 +19,20 @@ export class EbookEngine {
 
         let fullText = '';
         for (const name of contentFiles) {
-            const content = await zip.files[name].async('string');
+            let content = await zip.files[name].async('string');
+
+            // Remove TOC / Document Outlines that clutter the end of the text
+            content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+            content = content.replace(/<h[1-6][^>]*>(?:Document Outline|Table of Contents)<\/h[1-6]>[\s\S]*?<\/ul>/gi, '');
+
+            // Mark illustrations and explicit anchors as explicit page breaks 
+            content = content
+                .replace(/<a[^>]*id="p\d+"[^>]*>/gi, '\n\n---PAGE_BREAK---\n')
+                .replace(/<div(?:[^>]+)class="page_number[^>]*>([\s\S]*?)<\/div>/gi, '\n\n---PAGE_BREAK---\n[$1]\n\n')
+                .replace(/<img[^>]*>/gi, '\n\n[Imagine/Ilustrație]\n\n')
+                .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '\n\n[Ilustrație SVG]\n\n')
+                .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, '\n\n---PAGE_BREAK---\n$1\n\n');
+
             const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
 
             if (bodyMatch) {
@@ -32,7 +45,18 @@ export class EbookEngine {
         if (fullText.trim().length === 0) {
             // Fallback: extract any text from XML/XHTML files
             for (const name of contentFiles) {
-                const content = await zip.files[name].async('string');
+                let content = await zip.files[name].async('string');
+
+                content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+                content = content.replace(/<h[1-6][^>]*>(?:Document Outline|Table of Contents)<\/h[1-6]>[\s\S]*?<\/ul>/gi, '');
+
+                content = content
+                    .replace(/<a[^>]*id="p\d+"[^>]*>/gi, '\n\n---PAGE_BREAK---\n')
+                    .replace(/<div(?:[^>]+)class="page_number[^>]*>([\s\S]*?)<\/div>/gi, '\n\n---PAGE_BREAK---\n[$1]\n\n')
+                    .replace(/<img[^>]*>/gi, '\n\n[Imagine/Ilustrație]\n\n')
+                    .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '\n\n[Ilustrație SVG]\n\n')
+                    .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, '\n\n---PAGE_BREAK---\n$1\n\n');
+
                 const clean = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
                 fullText += clean + '\n\n---PAGE_BREAK---\n\n';
             }
