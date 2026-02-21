@@ -217,7 +217,8 @@ const Converter: React.FC<ConverterProps> = ({ category, allowedFormats }) => {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        // Delay revocation to ensure browser has time to start the download with the correct filename
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
     const downloadAll = () => {
