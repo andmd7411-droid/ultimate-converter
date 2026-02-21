@@ -15,7 +15,13 @@ export class DocumentEngine {
         // Split text to fit page width
         const splitText = doc.splitTextToSize(content, 180);
         doc.setFontSize(11);
-        doc.text(splitText, 15, 20);
+
+        const linesPerPage = 45;
+        for (let i = 0; i < splitText.length; i += linesPerPage) {
+            if (i > 0) doc.addPage();
+            const pageText = splitText.slice(i, i + linesPerPage);
+            doc.text(pageText, 15, 20);
+        }
 
         return doc.output('blob');
     }

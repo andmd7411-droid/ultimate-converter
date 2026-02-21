@@ -6,22 +6,40 @@ export class EbookEngine {
         const zip = new JSZip();
         await zip.loadAsync(file);
 
-        // Very basic approach: find all HTML-like files and concatenate them
-        // A truly robust parser would parse container.xml, content.opf, and spine.
-        const htmlFiles = Object.keys(zip.files).filter(name =>
-            name.endsWith('.html') || name.endsWith('.xhtml') || name.endsWith('.htm')
+        // Find content files (html, xhtml, xml, htm) 
+        // Ignoring metadata and structural files
+        const contentFiles = Object.keys(zip.files).filter(name =>
+            !name.includes('META-INF') &&
+            !name.endsWith('.opf') &&
+            !name.endsWith('.ncx') &&
+            !name.endsWith('.css') &&
+            !name.match(/\.(jpg|jpeg|png|gif|svg|woff|ttf)$/i) &&
+            name.match(/\.(html|xhtml|htm|xml)/i)
         );
 
         let fullText = '';
-        for (const name of htmlFiles) {
+        for (const name of contentFiles) {
             const content = await zip.files[name].async('string');
             const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const html = bodyMatch ? bodyMatch[1] : content;
-            fullText += html + '\n\n';
+
+            if (bodyMatch) {
+                fullText += bodyMatch[1] + '\n\n';
+            } else if (!name.endsWith('.xml')) {
+                fullText += content + '\n\n';
+            }
         }
 
         if (fullText.trim().length === 0) {
-            throw new Error("Nu s-a putut extrage text din acest EPUB. Poate fi protejat prin DRM.");
+            // Fallback: extract any text from XML/XHTML files
+            for (const name of contentFiles) {
+                const content = await zip.files[name].async('string');
+                const clean = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                fullText += clean + '\n\n';
+            }
+        }
+
+        if (fullText.trim().length === 0) {
+            throw new Error("Nu s-a putut extrage text din acest EPUB. Poate fi protejat prin DRM sau formatul este invalid.");
         }
 
         if (targetFormat === 'PDF') {
