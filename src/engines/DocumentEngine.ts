@@ -9,8 +9,9 @@ export class DocumentEngine {
     /**
      * Converts a text-based file or mixed blocks to PDF with high fidelity.
      */
-    static async toPDF(content: string | import('../types').DocumentBlock[], _title: string = 'Document'): Promise<Blob> {
+    static async toPDF(content: string | import('../types').DocumentBlock[], title: string = 'Document'): Promise<Blob> {
         const doc = new jsPDF();
+        doc.setProperties({ title });
         doc.setFontSize(11);
 
         let blocks: import('../types').DocumentBlock[];
@@ -41,7 +42,7 @@ export class DocumentEngine {
                 }
                 // we don't set isFirstPage to false here, because multiple consecutive page breaks on page 1 should be ignored
             } else if (block.type === 'text' && typeof block.content === 'string') {
-                let trimmed = block.content
+                const trimmed = block.content
                     .replace(/^\uFEFF/g, '') // BOM UTF-8
                     .replace(/^\uFFFE/g, '') // BOM UTF-16
                     .replace(/þÿ/g, '')      // Literal BOM chars usually seen in misencoded strings

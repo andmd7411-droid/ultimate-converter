@@ -40,16 +40,20 @@ export class EbookEngine {
             for (const part of parts) {
                 if (!part) continue;
 
-                if (part.match(/<a[^>]*id="p\d+"[^>]*>/i) || part.match(/<h[1-3][^>]*>/i)) {
-                    blocks.push({ type: 'page_break' });
-                    if (part.match(/<h[1-3][^>]*>/i)) {
-                        const text = part.replace(/<[^>]+>/g, ' ').trim();
-                        if (text) blocks.push({ type: 'text', content: text });
+                if (part.match(/<a[^>]*id="p\d+"[^>]*>/i)) {
+                    // Do NOT push a page_break for every anchor, just ignore the tag
+                    continue;
+                } else if (part.match(/<h[1-3][^>]*>/i)) {
+                    // Headers can optionally trigger a page break or just extra spacing
+                    // For now, let's just make it a new paragraph with extra spacing
+                    const text = part.replace(/<[^>]+>/g, ' ').trim();
+                    if (text) {
+                        blocks.push({ type: 'text', content: '\n' + text + '\n' });
                     }
                 } else if (part.match(/<div(?:[^>]+)class="page_number/i)) {
                     const text = part.replace(/<[^>]+>/g, ' ').trim();
-                    blocks.push({ type: 'page_break' });
-                    if (text) blocks.push({ type: 'text', content: `[${text}]` });
+                    // Optional: keep as tiny text or ignore. Let's keep it as [PAGE X] text.
+                    if (text) blocks.push({ type: 'text', content: `\n[${text}]\n` });
                 } else if (part.match(/<img|<image/i)) {
                     // Extract src
                     let src = '';
@@ -58,7 +62,6 @@ export class EbookEngine {
 
                     if (src) {
                         try {
-                            // Resolve path
                             const fullPath = new URL(src, 'http://localhost/' + baseDir).pathname.substring(1);
                             const imgFile = zip.files[fullPath] || zip.files[decodeURIComponent(fullPath)];
 
@@ -78,7 +81,7 @@ export class EbookEngine {
                     }
                 }
             }
-            blocks.push({ type: 'page_break' });
+            // NO mandatory page break here anymore
         }
 
         if (blocks.length === 0) {
