@@ -23,9 +23,9 @@ export class EbookEngine {
             const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
 
             if (bodyMatch) {
-                fullText += bodyMatch[1] + '\n\n';
+                fullText += bodyMatch[1] + '\n\n---PAGE_BREAK---\n\n';
             } else if (!name.endsWith('.xml')) {
-                fullText += content + '\n\n';
+                fullText += content + '\n\n---PAGE_BREAK---\n\n';
             }
         }
 
@@ -34,7 +34,7 @@ export class EbookEngine {
             for (const name of contentFiles) {
                 const content = await zip.files[name].async('string');
                 const clean = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-                fullText += clean + '\n\n';
+                fullText += clean + '\n\n---PAGE_BREAK---\n\n';
             }
         }
 

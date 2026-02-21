@@ -11,16 +11,31 @@ export class DocumentEngine {
      */
     static async toPDF(content: string, _title: string = 'Document'): Promise<Blob> {
         const doc = new jsPDF();
-
-        // Split text to fit page width
-        const splitText = doc.splitTextToSize(content, 180);
         doc.setFontSize(11);
 
-        const linesPerPage = 45;
-        for (let i = 0; i < splitText.length; i += linesPerPage) {
-            if (i > 0) doc.addPage();
-            const pageText = splitText.slice(i, i + linesPerPage);
-            doc.text(pageText, 15, 20);
+        const pagesRaw = content.split('---PAGE_BREAK---');
+        let isFirstPage = true;
+
+        for (let j = 0; j < pagesRaw.length; j++) {
+            const trimmed = pagesRaw[j].trim();
+            // Skip empty parts unless it's the only content
+            if (!trimmed && pagesRaw.length > 1) continue;
+
+            const splitText = doc.splitTextToSize(trimmed, 180);
+            const linesPerPage = 45;
+
+            if (splitText.length === 0) {
+                if (!isFirstPage) doc.addPage();
+                isFirstPage = false;
+                continue;
+            }
+
+            for (let i = 0; i < splitText.length; i += linesPerPage) {
+                if (!isFirstPage) doc.addPage();
+                isFirstPage = false;
+                const pageText = splitText.slice(i, i + linesPerPage);
+                doc.text(pageText, 15, 20);
+            }
         }
 
         return doc.output('blob');
